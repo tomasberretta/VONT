@@ -5,7 +5,9 @@
 // El sigueinte codigo funciona solamente para uno de los dos sensores, en este caso el S2
 // En el caso de necesitar el S3, repetir el procedimiento
 
-#define sensinf1 23 
+// #define sensinf1 23 
+#define sensinf1 39 
+
 
 void setup() {
 
