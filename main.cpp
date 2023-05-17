@@ -10,7 +10,7 @@
 MDNSResponder mdns;
 
 const char *ssid = "AndroidAP4FDD"; // Nombre de la red WIFI
-const char *password = "Tomas123";        // Contraseña de la red WIFI
+const char *password = "Tomas123";  // Contraseña de la red WIFI
 
 WiFiServer server(80);
 String webpage = "";
@@ -45,9 +45,9 @@ String header = "";
 #define ENC3B 15
 
 // SENSOR INFRARROJO
-#define sensinfDer 34 // derecha s4 
-#define sensinfIzq 23 // izquierda s2 
-#define sensinfCent 35 // centro s3 
+#define sensinfDer 34  // derecha s4
+#define sensinfIzq 23  // izquierda s2
+#define sensinfCent 35 // centro s3
 
 // FUNCIONES-FUNCIONES-FUNCIONES-FUNCIONES-FUNCIONES-FUNCIONES-FUNCIONES-FUNCIONES-FUNCIONES-FUNCIONES-FUNCIONES-
 // FUNCIONES-FUNCIONES-FUNCIONES-FUNCIONES-FUNCIONES-FUNCIONES-FUNCIONES-FUNCIONES-FUNCIONES-FUNCIONES-FUNCIONES-
@@ -97,7 +97,7 @@ void setup()
   pinMode(ENABLE3, OUTPUT);
 
   // Definimos los pines de los sensores infrarrojos
-  pinMode(sensinfDer, INPUT); 
+  pinMode(sensinfDer, INPUT);
   pinMode(sensinfIzq, INPUT);
   pinMode(sensinfCent, INPUT);
 
@@ -223,79 +223,162 @@ void FRENAR()
   analogWrite(IN32, 0);
 }
 
-int rotate(bool clockwise){
-  int rotation = 0;
-  while(digitalRead(sensinfCent) == LOW){
-        if (clockwise) ROTACION_HORARIA();
-        else ROTACION_ANTIHORARIA;
-        delay(1000);
-        FRENAR();
-        rotation++;
-        if(rotation >= 5){
-          while (rotation > 0){
-            if (clockwise) ROTACION_ANTIHORARIA();
-            else ROTACION_HORARIA;
-            delay(1000);
-            FRENAR();
-            rotation--;
-          }
-          break;
-        }
+bool followingLine = false;
 
-      }
-  FRENAR();
-  return rotation;
-}
+int CENTER = 0;
+int LEFT = 1;
+int RIGHT = 2;
 
-void printSensor(){
-  Serial.println("--------------------------");
-  Serial.println("Derecha: "+ (digitalRead(sensinfDer)));
-  Serial.println("Centro: "+ (digitalRead(sensinfCent)));
-  Serial.println("Izquierda: "+ (digitalRead(sensinfIzq)));
-  Serial.println("--------------------------");
-}
+int sensorPins[] = {sensinfCent, sensinfIzq, sensinfDer};
 
-void followLine (){
-  int rotation = 0;
- 
-  bool right = digitalRead(sensinfDer) == HIGH; 
-  bool left = digitalRead(sensinfIzq) == HIGH; 
-  bool middle = digitalRead(sensinfCent) == HIGH; 
+bool sensorValues[] = {false, false, false};
 
-  
-  printSensor();
-  if(digitalRead(sensinfCent) == LOW){
-    FRENAR();
-    if(digitalRead(sensinfIzq) == LOW && digitalRead(sensinfDer) == LOW){
-      int n = rotate(true);
-      if (n == 0) {
-        n = rotate(false);
-        delay(1000);
-        FRENAR();
-        if (n == 0) {
-          delay(1000);
-          FRENAR();
-          return; // NO PUEDE SEGUIR LA LINEA PORQUE NO LA ENCONTRO
-        }
-      }
+void readSensors()
+{
+  for (int i = 0; i < sizeof(sensorPins) / sizeof(sensorPins[0]); i++)
+  {
+    if (
+        digitalRead(sensorPins[i]) == LOW)
+    {
+      sensorValues[i] = false;
     }
-    else if (digitalRead(sensinfDer) == HIGH){
-      while(digitalRead(sensinfCent) == LOW){
-        ROTACION_HORARIA();
-        sleep(1);
-        FRENAR();
-      }
-    }
-    else if (digitalRead(sensinfIzq) == HIGH){
-      while(digitalRead(sensinfCent) == LOW){
-        ROTACION_ANTIHORARIA();
-        sleep(1);
-        FRENAR();
-      }
+    else
+    {
+      sensorValues[i] = true;
     }
   }
-  else{
-    ADELANTE();
+}
+
+void printSensors()
+{
+  Serial.println("--------------------------");
+  if (sensorValues[RIGHT])
+  {
+    Serial.println("Derecha: Blanco");
+  }
+  else
+  {
+    Serial.println("Derecha: Negro");
+  }
+  if (sensorValues[CENTER])
+  {
+    Serial.println("Centro: Blanco");
+  }
+  else
+  {
+    Serial.println("Centro: Negro");
+  }
+  if (sensorValues[LEFT])
+  {
+    Serial.println("Izquierda: Blanco");
+  }
+  else
+  {
+    Serial.println("Izquierda: Negro");
+  }
+  Serial.println("--------------------------");
+}
+
+bool rotate(bool clockwise, int rotationCounter)
+{
+  Serial.println("Starting rotate");
+  while (!sensorValues[CENTER])
+  {
+    Serial.println("Rotating " + rotationCounter);
+    if (rotationCounter == 0)
+      break;
+    else
+    {
+      if (clockwise)
+      {
+        ROTACION_HORARIA();
+        delay(1000);
+      }
+
+      else
+      {
+        ROTACION_ANTIHORARIA();
+        delay(1000);
+      }
+      rotationCounter--;
+    }
+    readSensors();
+    printSensors();
+  }
+  FRENAR();
+  delay(2000);
+  return rotationCounter != 0;
+}
+
+// void FOLLOW_LINE(){
+//   while (followingLine)
+//   {
+//     readSensors();
+//     printSensors();
+//     if(sensorValues[CENTER]){
+//       ADELANTE();
+//     }else{
+//       FRENAR();
+//     }
+//   }
+// }
+
+void FOLLOW_LINE()
+{
+  while (followingLine)
+  {
+    readSensors();
+    printSensors();
+    if (!sensorValues[CENTER]) // no encuentra la linea en el centro
+    {
+      FRENAR();
+      delay(2000);
+      if (!sensorValues[LEFT] && !sensorValues[RIGHT]) // no encuentra la linea en la izquierda ni en la derecha
+      {
+        bool foundLine = rotate(true, 5); // busca sentido horario
+        if (foundLine)
+          return;
+        else
+        {
+          rotate(false, 5);             // vuelve al inicio
+          foundLine = rotate(false, 5); // realiza la busqueda para el otro lado
+          return;
+        }
+      }
+      else if (sensorValues[RIGHT]) // si encuentra la linea a la derecha
+      {
+        readSensors();
+        printSensors();
+        while (!sensorValues[CENTER])
+        {
+          ROTACION_HORARIA();
+          delay(1000);
+          readSensors();
+          printSensors();
+        }
+        FRENAR();
+        delay(2000);
+      }
+      else if (sensorValues[LEFT]) // si encuentra la linea a la izquierda
+      {
+        readSensors();
+        printSensors();
+        while (!sensorValues[CENTER])
+        {
+          ROTACION_ANTIHORARIA();
+          delay(1000);
+          readSensors();
+          printSensors();
+        }
+        FRENAR();
+        delay(2000);
+      }
+    }
+    else
+    {
+      ADELANTE();
+      delay(2000);
+    }
   }
 }
 
@@ -308,11 +391,9 @@ void casos(String header2)
   Serial.println(str_valor);
   String input = "";
   input = str_valor;
-  bool followingLine = false;
 
   Serial.print("Input recibido: ");
   Serial.println(input); // Imprime el dato recibido en el monitor serie para un mejor comprension
-  printSensor();
   // En función del INPUT recibido por la app, llamamos a la funcion de movimiento necesaria
   if (!followingLine)
   {
@@ -348,7 +429,7 @@ void casos(String header2)
     else if (input == "L")
     {
       followingLine = true;
-      followLine();
+      FOLLOW_LINE();
     }
     else
     {
@@ -412,7 +493,7 @@ void parametrosWiFi()
     }
 
     casos(header); // Con el valor de header corre la función casos para comunicarse y mover al VONT en función del carácter dado.
-    header = "";   // Vvacía la variable header para poder volver a correr esta función
+    header = "";   // Vacía la variable header para poder volver a correr esta función
     client.stop(); // Y Corta comunicación con la app.
   }
 }
