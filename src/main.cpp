@@ -224,7 +224,7 @@ void FRENAR()
   analogWrite(IN32, 0);
 }
 
-bool followingLine = false;
+bool followingLine = false; // variable para mantener el loop del seguimiento de linea
 
 int CENTER = 0;
 int LEFT = 1;
@@ -239,7 +239,7 @@ void readSensors()
   for (int i = 0; i < sizeof(sensorPins) / sizeof(sensorPins[0]); i++)
   {
     if (
-        digitalRead(sensorPins[i]) == LOW)
+        digitalRead(sensorPins[i]) == LOW) // si el sensor lee LOW lo tomamos como false, es decir no leyó una línea
     {
       sensorValues[i] = false;
     }
@@ -280,13 +280,11 @@ void printSensors()
   Serial.println("--------------------------");
 }
 
-bool rotate(bool clockwise, int rotationCounter)
+bool rotate(bool clockwise, int rotationCounter) // rota hacia algun sentido con un contador arbitrario (para que no rote 180 y vuelva por donde vino)
 {
-  Serial.println("Starting rotate");
-  while (!sensorValues[CENTER])
+  while (!sensorValues[CENTER]) // rota mientras no haya detectado la linea con el sensor del medio
   {
-    Serial.println("Rotating " + rotationCounter);
-    if (rotationCounter == 0)
+    if (rotationCounter == 0) // llego al limite de rotacion arbitraria
       break;
     else
     {
@@ -296,61 +294,56 @@ bool rotate(bool clockwise, int rotationCounter)
         delay(100);
         FRENAR();
       }
-
       else
       {
         ROTACION_ANTIHORARIA();
         delay(100);
         FRENAR();
       }
-      delay(1000);
-      rotationCounter--;
+      delay(500);
+      rotationCounter--; // resta al contador arbitrario
     }
     readSensors();
     printSensors();
   }
   FRENAR();
-  delay(2000);
-  return rotationCounter != 0;
+  delay(500);
+  return rotationCounter != 0; // devuelve si terminó por haber encontrado la linea
 }
 
 void FOLLOW_LINE()
 {
   while (followingLine)
   {
-    char c = client.read();
-    if (c == 'F')
-    {
-      FRENAR();
-      followingLine = false;
-      break;
-    }
     readSensors();
     printSensors();
     if (!sensorValues[CENTER]) // no encuentra la linea en el centro
     {
       FRENAR();
-      delay(2000);
+      delay(1000);
       if (!sensorValues[LEFT] && !sensorValues[RIGHT]) // no encuentra la linea en la izquierda ni en la derecha
       {
-        bool foundLine = rotate(false, 10); // busca sentido horario
+        bool foundLine = rotate(false, 10); // busca sentido antihorario
         if (foundLine)
-          continue;
+          continue; // encontro la linea, asi que sigue con el loop
         else
         {
           rotate(true, 10);             // vuelve al inicio
           foundLine = rotate(true, 10); // realiza la busqueda para el otro lado
           if (foundLine)
-            continue;
+            continue; // encontro la linea, asi que sigue con el loop
           else
+          {
+            followingLine = false; // no encontro la linea, asi que finaliza el loop de seguimiento de la linea
             return;
+          }
         }
       }
       else if (sensorValues[RIGHT]) // si encuentra la linea a la derecha
       {
         readSensors();
         printSensors();
-        while (!sensorValues[CENTER])
+        while (!sensorValues[CENTER]) // rota mientras no encuentre la linea con el sensor del medio
         {
           ROTACION_HORARIA();
           delay(100);
@@ -364,7 +357,7 @@ void FOLLOW_LINE()
       {
         readSensors();
         printSensors();
-        while (!sensorValues[CENTER])
+        while (!sensorValues[CENTER]) // rota mientras no encuentre la linea con el sensor del medio
         {
           ROTACION_ANTIHORARIA();
           delay(100);
@@ -377,7 +370,7 @@ void FOLLOW_LINE()
     }
     else
     {
-      ADELANTE();
+      ADELANTE(); // sigue para adelante mientras la linea este en el centro
     }
   }
 }
@@ -395,58 +388,43 @@ void casos(String header2)
   Serial.print("Input recibido: ");
   Serial.println(input); // Imprime el dato recibido en el monitor serie para un mejor comprension
   // En función del INPUT recibido por la app, llamamos a la funcion de movimiento necesaria
-  if (!followingLine)
+  if (input == "W") // Llama a la funcion que corresponde a Avanzar
   {
-    if (input == "W") // Llama a la funcion que corresponde a Avanzar
-    {
 
-      ADELANTE();
-    }
-    else if (input == "S") // Llama a la funcion que corresponde a ir hacia atras
-    {
-      ATRAS();
-    }
-    else if (input == "A") // Llama a la funcion que corresponde a moverese a la izquierda
-    {
-      IZQUIERDA();
-    }
-    else if (input == "D") // Llama a la funcion que corresponde a mover a la derecha
-    {
-      DERECHA();
-    }
-    else if (input == "E") // Llama a la funcion que corresponde a rotar sobre su propio eje en sentido horario
-    {
-      ROTACION_HORARIA();
-    }
-    else if (input == "Q") // Llama a la funcion que corresponde a rotar sobre su propio eje en sentido anti-horario
-    {
-      ROTACION_ANTIHORARIA();
-    }
-    else if (input == "F") // Llama a la funcion que corresponde a frenar
-    {
-      FRENAR();
-    }
-    else if (input == "L")
-    {
-      followingLine = true;
-      FOLLOW_LINE();
-    }
-    else
-    {
-      Serial.println("VALOR INCORRECTO"); // En caso de que input contenga un caracter no contemplado, devuelve el aviso de valor incorrecto.
-    }
+    ADELANTE();
+  }
+  else if (input == "S") // Llama a la funcion que corresponde a ir hacia atras
+  {
+    ATRAS();
+  }
+  else if (input == "A") // Llama a la funcion que corresponde a moverese a la izquierda
+  {
+    IZQUIERDA();
+  }
+  else if (input == "D") // Llama a la funcion que corresponde a mover a la derecha
+  {
+    DERECHA();
+  }
+  else if (input == "E") // Llama a la funcion que corresponde a rotar sobre su propio eje en sentido horario
+  {
+    ROTACION_HORARIA();
+  }
+  else if (input == "Q") // Llama a la funcion que corresponde a rotar sobre su propio eje en sentido anti-horario
+  {
+    ROTACION_ANTIHORARIA();
+  }
+  else if (input == "F") // Llama a la funcion que corresponde a frenar
+  {
+    FRENAR();
+  }
+  else if (input == "L") // Llama a la funcion que al seguimiento de la linea
+  {
+    followingLine = true; // Settea la variable del loop en true
+    FOLLOW_LINE();        // Inicia el loop de seguimiento
   }
   else
   {
-    if (input == "F")
-    {
-      FRENAR();
-      followingLine = false;
-    }
-    else
-    {
-      Serial.println("VALOR NO PERMITIDO"); // En caso de que input contenga un caracter no contemplado, devuelve el aviso de valor incorrecto.
-    }
+    Serial.println("VALOR INCORRECTO"); // En caso de que input contenga un caracter no contemplado, devuelve el aviso de valor incorrecto.
   }
 }
 
