@@ -120,16 +120,16 @@ void setup()
 // o gire en la dirección pretenida según los vectores definidos.
 void ADELANTE()
 {
-  analogWrite(IN01, 150);
+  analogWrite(IN01, 100);
   analogWrite(IN02, 0);
 
-  analogWrite(IN11, 150);
+  analogWrite(IN11, 100);
   analogWrite(IN12, 0);
 
-  analogWrite(IN21, 150);
+  analogWrite(IN21, 100);
   analogWrite(IN22, 0);
 
-  analogWrite(IN31, 150);
+  analogWrite(IN31, 100);
   analogWrite(IN32, 0);
 }
 
@@ -151,61 +151,61 @@ void ATRAS()
 void ROTACION_HORARIA()
 {
   analogWrite(IN01, 0);
-  analogWrite(IN02, 150); // de 255 a 150
+  analogWrite(IN02, 140); // de 255 a 190
 
-  analogWrite(IN11, 150); // de 255 a 150
+  analogWrite(IN11, 140); // de 255 a 190
   analogWrite(IN12, 0);
 
   analogWrite(IN21, 0);
-  analogWrite(IN22, 150); // de 255 a 150
+  analogWrite(IN22, 140); // de 255 a 190
 
-  analogWrite(IN31, 150); // de 255 a 150
+  analogWrite(IN31, 140); // de 255 a 190
   analogWrite(IN32, 0);
 }
 
 void ROTACION_ANTIHORARIA()
 {
-  analogWrite(IN01, 150); // de 255 a 150
+  analogWrite(IN01, 140); // de 255 a 190
   analogWrite(IN02, 0);
 
   analogWrite(IN11, 0);
-  analogWrite(IN12, 150); // de 255 a 150
+  analogWrite(IN12, 140); // de 255 a 190
 
-  analogWrite(IN21, 150); // de 255 a 150
+  analogWrite(IN21, 140); // de 255 a 190
   analogWrite(IN22, 0);
 
   analogWrite(IN31, 0);
-  analogWrite(IN32, 150); // de 255 a 150
+  analogWrite(IN32, 140); // de 255 a 190
 }
 
 void IZQUIERDA()
 {
-  analogWrite(IN01, 255);
+  analogWrite(IN01, 190);
   analogWrite(IN02, 0);
 
   analogWrite(IN11, 0);
-  analogWrite(IN12, 255);
+  analogWrite(IN12, 190);
 
   analogWrite(IN21, 0);
-  analogWrite(IN22, 255);
+  analogWrite(IN22, 190);
 
-  analogWrite(IN31, 255);
+  analogWrite(IN31, 190);
   analogWrite(IN32, 0);
 }
 
 void DERECHA()
 {
   analogWrite(IN01, 0);
-  analogWrite(IN02, 255);
+  analogWrite(IN02, 190);
 
-  analogWrite(IN11, 255);
+  analogWrite(IN11, 190);
   analogWrite(IN12, 0);
 
-  analogWrite(IN21, 255);
+  analogWrite(IN21, 190);
   analogWrite(IN22, 0);
 
   analogWrite(IN31, 0);
-  analogWrite(IN32, 255);
+  analogWrite(IN32, 190);
 }
 
 void FRENAR()
@@ -225,6 +225,7 @@ void FRENAR()
 }
 
 bool followingLine = false; // variable para mantener el loop del seguimiento de linea
+bool lastDirectionClockwise = false;
 
 int CENTER = 0;
 int LEFT = 1;
@@ -239,13 +240,13 @@ void readSensors()
   for (int i = 0; i < sizeof(sensorPins) / sizeof(sensorPins[0]); i++)
   {
     if (
-        digitalRead(sensorPins[i]) == LOW) // si el sensor lee LOW lo tomamos como false, es decir no leyó una línea
+        digitalRead(sensorPins[i]) == HIGH) // si el sensor lee HIGH lo tomamos como true, es decir leyó una línea
     {
-      sensorValues[i] = false;
+      sensorValues[i] = true;
     }
     else
     {
-      sensorValues[i] = true;
+      sensorValues[i] = false;
     }
   }
 }
@@ -280,10 +281,26 @@ void printSensors()
   Serial.println("--------------------------");
 }
 
+void updateLastRotation() // funcion para mantener en una variable historica el ultimo sensor entre derecha e izquierda que encontró la línea
+{
+  readSensors();
+  printSensors();
+  if (sensorValues[LEFT])
+  {
+    lastDirectionClockwise = false;
+  }
+  else if (sensorValues[RIGHT])
+  {
+    lastDirectionClockwise = true;
+  }
+}
+
 bool rotate(bool clockwise, int rotationCounter) // rota hacia algun sentido con un contador arbitrario (para que no rote 180 y vuelva por donde vino)
 {
+
   while (!sensorValues[CENTER]) // rota mientras no haya detectado la linea con el sensor del medio
   {
+    updateLastRotation();
     if (rotationCounter == 0) // llego al limite de rotacion arbitraria
       break;
     else
@@ -291,23 +308,20 @@ bool rotate(bool clockwise, int rotationCounter) // rota hacia algun sentido con
       if (clockwise)
       {
         ROTACION_HORARIA();
-        delay(100);
+        delay(50);
         FRENAR();
       }
       else
       {
         ROTACION_ANTIHORARIA();
-        delay(100);
+        delay(50);
         FRENAR();
       }
-      delay(500);
       rotationCounter--; // resta al contador arbitrario
     }
     readSensors();
     printSensors();
   }
-  FRENAR();
-  delay(500);
   return rotationCounter != 0; // devuelve si terminó por haber encontrado la linea
 }
 
@@ -320,16 +334,15 @@ void FOLLOW_LINE()
     if (!sensorValues[CENTER]) // no encuentra la linea en el centro
     {
       FRENAR();
-      delay(1000);
-      if (!sensorValues[LEFT] && !sensorValues[RIGHT]) // no encuentra la linea en la izquierda ni en la derecha
+      if (!sensorValues[LEFT]) // no encuentra la linea en la izquierda ni en la derecha
       {
-        bool foundLine = rotate(false, 10); // busca sentido antihorario
+        bool foundLine = rotate(lastDirectionClockwise, 50); // busca sentido antihorario
         if (foundLine)
           continue; // encontro la linea, asi que sigue con el loop
         else
         {
-          rotate(true, 10);             // vuelve al inicio
-          foundLine = rotate(true, 10); // realiza la busqueda para el otro lado
+          rotate(!lastDirectionClockwise, 50);             // vuelve al inicio
+          foundLine = rotate(!lastDirectionClockwise, 50); // realiza la busqueda para el otro lado
           if (foundLine)
             continue; // encontro la linea, asi que sigue con el loop
           else
@@ -346,10 +359,11 @@ void FOLLOW_LINE()
         while (!sensorValues[CENTER]) // rota mientras no encuentre la linea con el sensor del medio
         {
           ROTACION_HORARIA();
-          delay(100);
+          delay(50);
           FRENAR();
           readSensors();
           printSensors();
+          updateLastRotation();
         }
         FRENAR();
       }
@@ -360,10 +374,11 @@ void FOLLOW_LINE()
         while (!sensorValues[CENTER]) // rota mientras no encuentre la linea con el sensor del medio
         {
           ROTACION_ANTIHORARIA();
-          delay(100);
+          delay(50);
           FRENAR();
           readSensors();
           printSensors();
+          updateLastRotation();
         }
         FRENAR();
       }
@@ -371,6 +386,7 @@ void FOLLOW_LINE()
     else
     {
       ADELANTE(); // sigue para adelante mientras la linea este en el centro
+      updateLastRotation();
     }
   }
 }
@@ -431,7 +447,6 @@ void casos(String header2)
 void parametrosWiFi()
 {                              // Esta es la función principal, que se encarga de traer la IP desde la app y comunicarsela al VONT.
   client = server.available(); // Se conecta mediante WiFi conn la app y se fija si está disponible para enviar o recibir ir información.
-
   if (client)
   {
 
@@ -465,10 +480,6 @@ void parametrosWiFi()
         else if (c != '\r')
         { // Si se vuelva al inicio de la cadena, anexa c a currenline para no perderlo.
           currentline = +c;
-        }
-        if (c == 'F')
-        {
-          followingLine = false;
         }
       }
     }
