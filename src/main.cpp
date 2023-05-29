@@ -249,6 +249,14 @@ void readSensors()
       sensorValues[i] = false;
     }
   }
+  if (sensorValues[LEFT])
+  {
+    lastDirectionClockwise = false;
+  }
+  else if (sensorValues[RIGHT])
+  {
+    lastDirectionClockwise = true;
+  }
 }
 
 void printSensors()
@@ -281,37 +289,24 @@ void printSensors()
   Serial.println("--------------------------");
 }
 
-void updateLastRotation() // funcion para mantener en una variable historica el ultimo sensor entre derecha e izquierda que encontró la línea
-{
-  readSensors();
-  printSensors();
-  if (sensorValues[LEFT])
-  {
-    lastDirectionClockwise = false;
-  }
-  else if (sensorValues[RIGHT])
-  {
-    lastDirectionClockwise = true;
-  }
-}
 
 bool rotate(bool clockwise, int rotationCounter) // rota hacia algun sentido con un contador arbitrario (para que no rote 180 y vuelva por donde vino)
 {
 
   while (!sensorValues[CENTER]) // rota mientras no haya detectado la linea con el sensor del medio
   {
-    updateLastRotation();
+    clockwise = lastDirectionClockwise;
     if (rotationCounter == 0) // llego al limite de rotacion arbitraria
       break;
     else
     {
-      if (clockwise)
+      if (clockwise || sensorValues[RIGHT])
       {
         ROTACION_HORARIA();
         delay(50);
         FRENAR();
       }
-      else
+      else if (!clockwise || sensorValues[LEFT])
       {
         ROTACION_ANTIHORARIA();
         delay(50);
@@ -334,15 +329,16 @@ void FOLLOW_LINE()
     if (!sensorValues[CENTER]) // no encuentra la linea en el centro
     {
       FRENAR();
-      if (!sensorValues[LEFT]) // no encuentra la linea en la izquierda ni en la derecha
+      if (!sensorValues[LEFT]&& !sensorValues[RIGHT]) // no encuentra la linea en la izquierda ni en la derecha
       {
         bool foundLine = rotate(lastDirectionClockwise, 50); // busca sentido antihorario
         if (foundLine)
           continue; // encontro la linea, asi que sigue con el loop
         else
         {
-          rotate(!lastDirectionClockwise, 50);             // vuelve al inicio
-          foundLine = rotate(!lastDirectionClockwise, 50); // realiza la busqueda para el otro lado
+          lastDirectionClockwise = !lastDirectionClockwise;
+          rotate(lastDirectionClockwise, 50);             // vuelve al inicio
+          foundLine = rotate(lastDirectionClockwise, 50); // realiza la busqueda para el otro lado
           if (foundLine)
             continue; // encontro la linea, asi que sigue con el loop
           else
@@ -363,7 +359,6 @@ void FOLLOW_LINE()
           FRENAR();
           readSensors();
           printSensors();
-          updateLastRotation();
         }
         FRENAR();
       }
@@ -378,7 +373,6 @@ void FOLLOW_LINE()
           FRENAR();
           readSensors();
           printSensors();
-          updateLastRotation();
         }
         FRENAR();
       }
@@ -386,7 +380,6 @@ void FOLLOW_LINE()
     else
     {
       ADELANTE(); // sigue para adelante mientras la linea este en el centro
-      updateLastRotation();
     }
   }
 }
