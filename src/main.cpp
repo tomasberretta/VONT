@@ -295,19 +295,20 @@ void printSensors()
   Serial.println("--------------------------");
 }
 
-void performOneRotationMovement(bool clockwise){
+void performOneRotationMovement(bool clockwise)
+{
   if (clockwise)
-    {
-      ROTACION_HORARIA();
-      delay(50);
-      FRENAR();
-    }
-    else
-    {
-      ROTACION_ANTIHORARIA();
-      delay(50);
-      FRENAR();
-    }
+  {
+    ROTACION_HORARIA();
+    delay(50);
+    FRENAR();
+  }
+  else
+  {
+    ROTACION_ANTIHORARIA();
+    delay(50);
+    FRENAR();
+  }
 }
 
 void undoRotation()
@@ -316,14 +317,16 @@ void undoRotation()
   {
     bool rotationToPerform = rotationMovements.top();
     performOneRotationMovement(!rotationToPerform);
-    delay(200);
+    delay(100);
     rotationMovements.pop();
   }
 }
 
-bool rotate(bool clockwise, int rotationCounter) // rota hacia algun sentido con un contador arbitrario (para que no rote 180 y vuelva por donde vino)
+bool rotate(bool clockwise, int rotationCounter, bool override) // rota hacia algun sentido con un contador arbitrario (para que no rote 180 y vuelva por donde vino)
 {
-
+  if (override){
+    lastDirectionClockwise = clockwise;
+  }
   while (!sensorValues[CENTER]) // rota mientras no haya detectado la linea con el sensor del medio
   {
     clockwise = lastDirectionClockwise;
@@ -360,13 +363,15 @@ void FOLLOW_LINE()
       FRENAR();
       if (!sensorValues[LEFT] && !sensorValues[RIGHT]) // no encuentra la linea en la izquierda ni en la derecha
       {
-        bool foundLine = rotate(lastDirectionClockwise, arbitraryRotationCount); // busca sentido antihorario
+        bool initialRotationDirection = lastDirectionClockwise;
+        bool foundLine = rotate(initialRotationDirection, arbitraryRotationCount, false); // busca sentido antihorario
         if (foundLine)
           continue; // encontro la linea, asi que sigue con el loop
         else
         {
           undoRotation();
-          foundLine = rotate(!lastDirectionClockwise, arbitraryRotationCount); // realiza la busqueda para el otro lado
+          initialRotationDirection = !initialRotationDirection;
+          foundLine = rotate(initialRotationDirection, arbitraryRotationCount, true); // realiza la busqueda para el otro lado
           if (foundLine)
             continue; // encontro la linea, asi que sigue con el loop
           else
@@ -385,7 +390,8 @@ void FOLLOW_LINE()
           performOneRotationMovement(true);
           readSensors();
           printSensors();
-          if (sensorValues[LEFT]){
+          if (sensorValues[LEFT])
+          {
             performOneRotationMovement(false);
             break;
           }
@@ -401,7 +407,8 @@ void FOLLOW_LINE()
           performOneRotationMovement(false);
           readSensors();
           printSensors();
-          if (sensorValues[RIGHT]){
+          if (sensorValues[RIGHT])
+          {
             performOneRotationMovement(true);
             break;
           }
@@ -462,7 +469,7 @@ void casos(String header2)
   {
     followingLine = true; // Settea la variable del loop en true
     rotationMovements.empty();
-    FOLLOW_LINE();        // Inicia el loop de seguimiento
+    FOLLOW_LINE(); // Inicia el loop de seguimiento
   }
   else
   {
