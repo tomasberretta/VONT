@@ -6,6 +6,9 @@
 #include <HardwareSerial.h>
 #include <Arduino.h>
 #include <iostream>
+#include <stack>
+
+using namespace std;
 
 MDNSResponder mdns;
 
@@ -226,6 +229,7 @@ void FRENAR()
 
 bool followingLine = false; // variable para mantener el loop del seguimiento de linea
 bool lastDirectionClockwise = false;
+stack<bool> rotationMovements;
 
 int CENTER = 0;
 int LEFT = 1;
@@ -234,6 +238,8 @@ int RIGHT = 2;
 int sensorPins[] = {sensinfCent, sensinfIzq, sensinfDer};
 
 bool sensorValues[] = {false, false, false};
+
+int arbitraryRotationCount = 30;
 
 void readSensors()
 {
@@ -289,6 +295,31 @@ void printSensors()
   Serial.println("--------------------------");
 }
 
+void performOneRotationMovement(bool clockwise){
+  if (clockwise)
+    {
+      ROTACION_HORARIA();
+      delay(50);
+      FRENAR();
+    }
+    else
+    {
+      ROTACION_ANTIHORARIA();
+      delay(50);
+      FRENAR();
+    }
+}
+
+void undoRotation()
+{
+  while (rotationMovements.size() != 0)
+  {
+    bool rotationToPerform = rotationMovements.top();
+    performOneRotationMovement(!rotationToPerform);
+    delay(200);
+    rotationMovements.pop();
+  }
+}
 
 bool rotate(bool clockwise, int rotationCounter) // rota hacia algun sentido con un contador arbitrario (para que no rote 180 y vuelva por donde vino)
 {
@@ -302,15 +333,13 @@ bool rotate(bool clockwise, int rotationCounter) // rota hacia algun sentido con
     {
       if (clockwise || sensorValues[RIGHT])
       {
-        ROTACION_HORARIA();
-        delay(50);
-        FRENAR();
+        performOneRotationMovement(true);
+        rotationMovements.push(true);
       }
       else if (!clockwise || sensorValues[LEFT])
       {
-        ROTACION_ANTIHORARIA();
-        delay(50);
-        FRENAR();
+        performOneRotationMovement(false);
+        rotationMovements.push(false);
       }
       rotationCounter--; // resta al contador arbitrario
     }
@@ -329,16 +358,15 @@ void FOLLOW_LINE()
     if (!sensorValues[CENTER]) // no encuentra la linea en el centro
     {
       FRENAR();
-      if (!sensorValues[LEFT]&& !sensorValues[RIGHT]) // no encuentra la linea en la izquierda ni en la derecha
+      if (!sensorValues[LEFT] && !sensorValues[RIGHT]) // no encuentra la linea en la izquierda ni en la derecha
       {
-        bool foundLine = rotate(lastDirectionClockwise, 50); // busca sentido antihorario
+        bool foundLine = rotate(lastDirectionClockwise, arbitraryRotationCount); // busca sentido antihorario
         if (foundLine)
           continue; // encontro la linea, asi que sigue con el loop
         else
         {
-          lastDirectionClockwise = !lastDirectionClockwise;
-          rotate(lastDirectionClockwise, 50);             // vuelve al inicio
-          foundLine = rotate(lastDirectionClockwise, 50); // realiza la busqueda para el otro lado
+          undoRotation();
+          foundLine = rotate(!lastDirectionClockwise, arbitraryRotationCount); // realiza la busqueda para el otro lado
           if (foundLine)
             continue; // encontro la linea, asi que sigue con el loop
           else
@@ -354,11 +382,13 @@ void FOLLOW_LINE()
         printSensors();
         while (!sensorValues[CENTER]) // rota mientras no encuentre la linea con el sensor del medio
         {
-          ROTACION_HORARIA();
-          delay(50);
-          FRENAR();
+          performOneRotationMovement(true);
           readSensors();
           printSensors();
+          if (sensorValues[LEFT]){
+            performOneRotationMovement(false);
+            break;
+          }
         }
         FRENAR();
       }
@@ -368,11 +398,13 @@ void FOLLOW_LINE()
         printSensors();
         while (!sensorValues[CENTER]) // rota mientras no encuentre la linea con el sensor del medio
         {
-          ROTACION_ANTIHORARIA();
-          delay(50);
-          FRENAR();
+          performOneRotationMovement(false);
           readSensors();
           printSensors();
+          if (sensorValues[RIGHT]){
+            performOneRotationMovement(true);
+            break;
+          }
         }
         FRENAR();
       }
@@ -429,6 +461,7 @@ void casos(String header2)
   else if (input == "L") // Llama a la funcion que al seguimiento de la linea
   {
     followingLine = true; // Settea la variable del loop en true
+    rotationMovements.empty();
     FOLLOW_LINE();        // Inicia el loop de seguimiento
   }
   else
